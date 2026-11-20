@@ -1,17 +1,19 @@
 # LingBot-VA-Suture
 
-LingBot-VA-Suture adapts [LingBot-VA](https://github.com/Robbyant/lingbot-va), a video-action world model, to suturing with the da Vinci Research Kit (dVRK). The released weights are `lingbot-va-base` post-trained on the SutureBot data of [Open-H-Embodiment](https://arxiv.org/abs/2604.21017).
+LingBot-VA-Suture adapts [LingBot-VA](https://github.com/Robbyant/lingbot-va), a video-action world model, to suturing with the da Vinci Research Kit (dVRK). It is the world action model baseline of [Open-H-Embodiment](https://arxiv.org/abs/2604.21017).
+
+Weights: [huggingface.co/semaphorsurgical/lingbot-va-suture](https://huggingface.co/semaphorsurgical/lingbot-va-suture). They are `lingbot-va-base`, further pre-trained on the JHU IMERSE dVRK data of Open-H-Embodiment and then post-trained on its SutureBot data.
 
 At every step the model predicts a chunk of future video latents and the end-effector actions that realise them. Past chunks stay in a transformer KV cache, so a session runs as a stream.
 
-This repository holds the code to run the model and to post-train it. It is a reduced and modified copy of the LingBot-VA code base.
+This repository holds the code to run the model and to post-train it on SutureBot. It is a reduced and modified copy of the LingBot-VA code base.
 
 ## Model
 
 | | |
 |:--|:--|
 | Cameras | endoscope (left eye), left wrist, right wrist; resized to 480 x 640 |
-| Prompt | one sub-task: `needle pickup`, `needle handover`, `needle throw`, `needle extract`, `knot tying` |
+| Prompt | `Perform surgical manipulation (hf_suturebot_separated).`, the one prompt of the training; the server uses it by default |
 | Actions | 16 values per step at 30 Hz: left arm (PSM2) pose and jaw, then right arm (PSM1) pose and jaw |
 | Chunk | 48 actions (1.6 s) and 4 latent video frames (16 frames at 10 fps) |
 
@@ -27,17 +29,11 @@ Python 3.10, PyTorch 2.9, one CUDA GPU for inference.
 pip install -r requirements.txt
 ```
 
-Download the base model, which provides the VAE, the tokenizer and the text encoder:
+Download the base model, which provides the VAE, the tokenizer and the text encoder, and the LingBot-VA-Suture transformer:
 
 ```bash
 hf download robbyant/lingbot-va-base --local-dir ./lingbot-va-base
-```
-
-The LingBot-VA-Suture transformer is in a Hugging Face bucket. `hf buckets` needs a recent `huggingface_hub`, newer than `transformers` 4.55 accepts, so run it from a separate environment:
-
-```bash
-python -m venv hf_env && hf_env/bin/pip install -U huggingface_hub
-hf_env/bin/hf buckets sync hf://buckets/semaphorsurgical/lingbot-va-suture ./lingbot-va-suture-weights
+hf download semaphorsurgical/lingbot-va-suture --local-dir ./lingbot-va-suture
 ```
 
 ## Inference
@@ -52,22 +48,20 @@ Test it from a second terminal. Without `--images` the client sends blank frames
 
 ```bash
 # closed loop
-python test_client.py --mode server --prompt "needle pickup" \
-    --images endoscope_left.png wrist_left.png wrist_right.png
+python test_client.py --mode server --images endoscope_left.png wrist_left.png wrist_right.png
 # open loop: predicted video frames and actions are saved to ./va_test_output
-python test_client.py --mode i2va --prompt "needle pickup" \
-    --images endoscope_left.png wrist_left.png wrist_right.png
+python test_client.py --mode i2va --images endoscope_left.png wrist_left.png wrist_right.png
 ```
 
 Images are sent as base64-encoded PNGs, one per camera, in the order above.
 
 | Endpoint | Request | Result |
 |:--|:--|:--|
-| `GET /health` | | camera order and trained prompts |
-| `POST /reset` | `prompt` | starts a session |
+| `GET /health` | | camera order and trained prompt |
+| `POST /reset` | `prompt` (optional) | starts a session |
 | `POST /infer_chunk` | `frames`: current observation, first chunk only | `actions` [48, 16] |
 | `POST /cache` | `frames`: the frames observed at 10 fps while the chunk was executed | updates the KV cache |
-| `POST /infer` | `frames`, `text`, `num_chunks` | open-loop rollout: `actions` and decoded `video_frames` |
+| `POST /infer` | `frames`, `num_chunks`, `text` (optional) | open-loop rollout: `actions` and decoded `video_frames` |
 
 A closed-loop session is `/reset`, then `/infer_chunk` and `/cache` in turn. `/cache` takes 16 frames per chunk. With fewer frames, down to 13, the last one is repeated. The server keeps the actions it returned and writes them into the cache together with the observed frames.
 
@@ -88,7 +82,9 @@ python preprocess/compute_action_stats.py --dataset_path /path/to/suturebot_data
 
 Step 3 prints `norm_stat`. Put it into `wan_va/configs/va_suturebot_cfg.py`. The values in the repository belong to the released weights.
 
-Set `dataset_path` and the model paths in `wan_va/configs/`, then start the training with FSDP on all GPUs of one node:
+Step 1 labels every segment with its sub-task (`needle pickup`, `needle handover`, `needle throw`, `needle extract`, `knot tying`), which becomes the prompt: list these prompts as `task_prompts` in the config. The released weights come from an earlier version of this pipeline, with one prompt for all segments and without a fixed sign of the action quaternions.
+
+Set `dataset_path` and the model paths in `wan_va/configs/`. Training starts from `lingbot-va-base`, or from the weights that `resume_from` points to. Start it with FSDP on the GPUs of one node:
 
 ```bash
 NGPU=8 bash script/run_suturebot_posttrain.sh --save-root ./train_out

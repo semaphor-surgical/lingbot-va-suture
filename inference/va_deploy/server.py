@@ -37,9 +37,6 @@ REPO_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, REPO_ROOT)
 
-from wan_va.configs import VA_CONFIGS  # noqa: E402
-from wan_va.wan_va_server import VA_Server  # noqa: E402
-
 # Keys of the model config that the deploy config may override
 MODEL_OVERRIDES = ('enable_offload', 'num_inference_steps',
                    'action_num_inference_steps', 'video_exec_step',
@@ -47,7 +44,8 @@ MODEL_OVERRIDES = ('enable_offload', 'num_inference_steps',
 
 
 class ResetRequest(BaseModel):
-    prompt: str = Field(..., description='Task prompt of the session.')
+    prompt: str | None = Field(
+        None, description='Task prompt. Default: the prompt of the training.')
 
 
 class ChunkRequest(BaseModel):
@@ -67,7 +65,8 @@ class CacheRequest(BaseModel):
 class InferRequest(BaseModel):
     frames: list[str] = Field(...,
                               description='Observation, one image per camera.')
-    text: str = Field(..., description='Task prompt.')
+    text: str | None = Field(
+        None, description='Task prompt. Default: the prompt of the training.')
     num_chunks: int = Field(4, ge=1, le=16)
 
 
@@ -82,6 +81,10 @@ def encode_image(frame):
 
 
 def load_model(deploy_cfg):
+    # Imported here: the GPU must be selected before CUDA is initialized
+    from wan_va.configs import VA_CONFIGS
+    from wan_va.wan_va_server import VA_Server
+
     config = EasyDict(VA_CONFIGS[deploy_cfg['va_config']])
     config.wan22_pretrained_model_name_or_path = deploy_cfg['base_model']
     config.checkpoint_path = deploy_cfg['checkpoint']
@@ -146,9 +149,10 @@ def create_app(deploy_cfg):
     @app.post('/reset')
     async def reset(request: ResetRequest):
         model = state['model']
-        model.reset(request.prompt)
-        response = {'status': 'ok', 'prompt': request.prompt}
-        if request.prompt not in model.config.task_prompts:
+        prompt = request.prompt or model.config.task_prompts[0]
+        model.reset(prompt)
+        response = {'status': 'ok', 'prompt': prompt}
+        if prompt not in model.config.task_prompts:
             response['warning'] = (
                 'The model was not trained on this prompt. Trained prompts: '
                 f'{model.config.task_prompts}')
@@ -200,7 +204,8 @@ def create_app(deploy_cfg):
         model = state['model']
         t0 = time.time()
         actions, latents = model.generate(frames_to_obs(request.frames),
-                                          request.text,
+                                          request.text
+                                          or model.config.task_prompts[0],
                                           request.num_chunks,
                                           seed=seed)
         video = model.decode_video(latents)
@@ -230,8 +235,7 @@ def main():
         deploy_cfg = yaml.safe_load(f)
 
     # After this, the selected GPU is the only visible one: cuda:0
-    os.environ.setdefault('CUDA_VISIBLE_DEVICES',
-                          str(deploy_cfg.get('gpu_id', 0)))
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(deploy_cfg.get('gpu_id', 0))
     uvicorn.run(create_app(deploy_cfg),
                 host=deploy_cfg.get('host', '127.0.0.1'),
                 port=deploy_cfg.get('port', 8100))

@@ -39,6 +39,7 @@ def post(server, endpoint, payload):
 
 def run_server_mode(args, frames):
     reset = post(args.server, 'reset', {'prompt': args.prompt})
+    print(f"Prompt: {reset['prompt']}")
     if 'warning' in reset:
         print(f"WARNING: {reset['warning']}")
 
@@ -84,7 +85,8 @@ def main():
     parser.add_argument('--mode', choices=['server', 'i2va'], default='server')
     parser.add_argument('--images', nargs='*',
                         help='One image per camera, in the order of /health.')
-    parser.add_argument('--prompt', default='needle pickup')
+    parser.add_argument('--prompt', default=None,
+                        help='Default: the prompt the model was trained with.')
     parser.add_argument('--num_chunks', type=int, default=3)
     parser.add_argument('--output_dir', default='./va_test_output')
     args = parser.parse_args()

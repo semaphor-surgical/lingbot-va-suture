@@ -28,13 +28,10 @@ va_suturebot_cfg.obs_cam_keys = [
     'observation.images.cam_right_wrist',
 ]
 
-# Sub-task prompts the model was trained on
+# Prompts the model was trained on; the first one is the default.
+# The released weights were trained with a single prompt for all sub-tasks.
 va_suturebot_cfg.task_prompts = [
-    'needle pickup',
-    'needle handover',
-    'needle throw',
-    'needle extract',
-    'knot tying',
+    'Perform surgical manipulation (hf_suturebot_separated).',
 ]
 
 va_suturebot_cfg.guidance_scale = 5
@@ -70,19 +67,19 @@ va_suturebot_cfg.inverse_used_action_channel_ids = inverse_used_action_channel_i
 va_suturebot_cfg.action_norm_method = 'quantiles'
 va_suturebot_cfg.norm_stat = {
     "q01": [
-        -0.009022, -0.005911, -0.007823, -0.184765, -0.239764, -0.264861, 0.923451,  # left pose
+        -0.009242, -0.005860, -0.009843, -0.257930, -0.238199, -0.263354, -0.995259,  # left pose
         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,  # left joints (unused)
-        -0.020887, -0.012911, -0.018214, -0.224219, -0.242405, -0.343701, 0.798794,  # right pose
+        -0.020594, -0.013740, -0.019072, -0.281972, -0.251734, -0.353548, 0.805391,  # right pose
         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,  # right joints (unused)
         -0.349066,  # left jaw
         -0.349066,  # right jaw
     ],
     "q99": [
-        0.012338, 0.005136, 0.012233, 0.288708, 0.159472, 0.160411, 1.000000,  # left pose
+        0.012202, 0.005412, 0.011854, 0.265194, 0.207093, 0.290885, 1.000000,  # left pose
         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,  # left joints (unused)
-        0.008082, 0.013642, 0.012386, 0.340548, 0.209883, 0.534306, 1.000000,  # right pose
+        0.008644, 0.012457, 0.012125, 0.335563, 0.225452, 0.525455, 1.000000,  # right pose
         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,  # right joints (unused)
-        0.919616,  # left jaw
-        0.924350,  # right jaw
+        0.926090,  # left jaw
+        0.959298,  # right jaw
     ],
 }
