@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# local configuration and outputs
+inference/va_deploy/deploy_config.yaml
+train_out/
+va_test_output/
+wandb/
+
+# weights and data
+*.pt
+*.pth
+*.safetensors
+*.mp4
+*.parquet

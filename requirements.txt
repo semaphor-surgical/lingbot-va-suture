@@ -1,0 +1,23 @@
+torch==2.9.0
+diffusers==0.36.0
+transformers==4.55.2
+accelerate
+safetensors
+numpy
+scipy
+einops
+easydict
+ftfy
+tqdm
+Pillow
+
+# Inference server
+fastapi
+uvicorn
+pyyaml
+requests
+
+# Preprocessing and post-training
+av
+pyarrow
+wandb

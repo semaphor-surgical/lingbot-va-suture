@@ -1,0 +1,26 @@
+# Copy to deploy_config.yaml and fill in the two model paths.
+
+va_config: "suturebot"
+# lingbot-va-base (vae/, tokenizer/, text_encoder/)
+base_model: "/path/to/lingbot-va-base"
+# LingBot-VA-Suture weights (a directory that contains transformer/)
+checkpoint: "/path/to/lingbot-va-suture"
+
+host: "0.0.0.0"
+port: 8100
+gpu_id: 0
+
+# Keep the VAE and the text encoder on the CPU between uses (saves GPU memory)
+enable_offload: false
+# Compile the transformer: the first inference is slow, later ones are faster
+torch_compile: false
+# Fixed noise: the same inputs give the same outputs
+deterministic: true
+seed: 42
+
+# Optional overrides of wan_va/configs/va_suturebot_cfg.py
+# num_inference_steps: 25
+# action_num_inference_steps: 50
+# video_exec_step: -1          # N > 0: stop the video denoising after N steps
+# guidance_scale: 5
+# action_guidance_scale: 1
